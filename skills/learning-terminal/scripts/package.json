@@ -1,0 +1,9 @@
+{
+  "name": "learning-terminal-reader",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22.12"},
+  "dependencies": {"katex": "0.18.7", "marked": "18.0.12"},
+  "scripts": {"test": "node --test reader.test.mjs"}
+}
