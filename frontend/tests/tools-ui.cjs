@@ -1,0 +1,16 @@
+const {chromium}=require('playwright');
+const {spawn}=require('child_process'),fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..'),dir=fs.mkdtempSync(path.join(__dirname,'artifacts','tools-ui-'));
+const p=spawn('python',['-X','utf8','tests/tool_fixture.py',path.join(dir,'hub.db')],{cwd:root,windowsHide:true});let browser;
+(async()=>{const url=await new Promise((resolve,reject)=>{let s='';p.stdout.on('data',d=>{s+=d;if(s.includes('\n'))resolve(s.trim())});p.on('error',reject);p.on('exit',c=>reject(Error('server '+c)));setTimeout(()=>reject(Error('timeout')),15000).unref()});
+ browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({viewport:{width:1440,height:1100}});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ await page.goto(url);await page.getByText('● 本地已连接').waitFor();await page.locator('nav [data-view=tools]').click();await page.getByText('● 工具服务已连接',{exact:false}).waitFor();
+ await page.locator('[data-tool="homework-crawler"][data-dry="true"]').click();await page.locator('#detail .badge.waiting_tool').waitFor();await page.locator('#detail .badge.review').waitFor({timeout:20000});assert((await page.locator('#detail').textContent()).includes('fixture-1'));await page.locator('#detail [data-close=detail]').click();
+ await page.locator('[data-tool="dirwatch"][data-tool-action="disable"]').click();await page.locator('#detail .badge.review').waitFor({timeout:12000});await page.locator('#detail [data-close=detail]').click();await page.locator('[data-tool="dirwatch"][data-tool-action="enable"]').waitFor();
+ await page.locator('[data-select-tool="material-transfer"]').click();await page.getByText('已下载 · 待确认保存',{exact:true}).waitFor();await page.getByText('iOS 已确认保存',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'补发此条',exact:true}).click();await page.locator('#detail .badge.review').waitFor({timeout:12000});await page.locator('#detail [data-close=detail]').click();await page.locator('#refresh').click();
+ const table=page.locator('.items-table');assert((await table.locator('tbody tr').first().textContent()).includes('待手机领取'));
+ await page.screenshot({path:path.join(dir,'tools.png'),fullPage:true});await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.route('**/api/tools',route=>route.fulfill({json:{online:false,tools:[],error:'测试断线'}}));await page.locator('#refresh').click();await page.getByText('工具服务离线：',{exact:false}).waitFor();assert.equal(await page.locator('[data-tool-action]').count(),0);assert.deepEqual(errors,[]);
+ console.log(JSON.stringify({ok:true,screenshot:path.join(dir,'tools.png'),checks:['accepted-not-complete','poll-result','disable','backfill-single','served-not-acked','offline-no-actions','no-js-errors']}));
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(browser)await browser.close();p.kill()});
