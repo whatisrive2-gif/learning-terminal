@@ -1,0 +1,25 @@
+{
+  "name": "learning-terminal",
+  "version": "0.0.1",
+  "description": "在 Codex 中编译学习材料、持续重构讲解，并维护 Obsidian 知识库。",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "学习终端 · Learning Terminal",
+    "shortDescription": "材料编译、对话重构、知识入库。",
+    "longDescription": "由用户主导学习方向，Codex 将文档、字幕和本地音视频转录组织为可独立阅读的讲解；支持版本、支线、需要记录，以及带预览、冲突检查和撤销的 Obsidian 维护。",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "用学习终端带我理解这份材料。",
+      "继续上次学习，围绕我的新问题重组讲解。",
+      "把这次学习整理到 Obsidian，先展示改动。"
+    ]
+  }
+}
