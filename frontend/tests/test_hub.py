@@ -72,7 +72,7 @@ class CoreTests(unittest.TestCase):
         t = self.act(t, 'approve', evidence='人工核对')
         t = self.act(t, 'reopen')
         self.assertEqual(t['state'], 'draft')
-        self.assertEqual(len(self.s.export()['events']), 4)
+        self.assertEqual(len([e for e in self.s.export()['events'] if e['task']==t['id']]), 4)
 
     def test_invalid_executor_and_missing_dependency(self):
         with self.assertRaises(ValueError): self.make(executor='shell')

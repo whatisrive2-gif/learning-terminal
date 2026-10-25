@@ -29,9 +29,15 @@ class Store:
         self.db.executescript('''
           CREATE TABLE IF NOT EXISTS tasks(id TEXT PRIMARY KEY, data TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY, task TEXT, time TEXT, kind TEXT, detail TEXT);
-          PRAGMA user_version=1;
+          CREATE TABLE IF NOT EXISTS records(kind TEXT, id TEXT, data TEXT, PRIMARY KEY(kind,id));
+          PRAGMA user_version=2;
         ''')
         with self.lock, self.db:
+            for row in self.db.execute("SELECT id,data FROM records WHERE kind='submissions'").fetchall():
+                item=json.loads(row['data'])
+                if item.get('status')=='sending':
+                    item.update(status='unknown',receipt='提交期间服务重启，请核对渠道；不会自动重发',revision=item['revision']+1)
+                    self.db.execute("UPDATE records SET data=? WHERE kind='submissions' AND id=?",(json.dumps(item,ensure_ascii=False),row['id']))
             for task in self.list():
                 if task['state'] == 'running':
                     task['state'] = 'unknown'
@@ -105,6 +111,8 @@ class Store:
             task = dict(id=uuid.uuid4().hex, state='draft', created=now(), revision=0,
                         notes='', category='学习', due='', session='', agent='', result='', evidence='', run_id='')
             self._fields(task, data)
+            from .workspace import attach_context
+            attach_context(self, task, data)
             return self._save(task, 'created', '任务已记录')
 
     def blocked(self, task):
@@ -117,10 +125,32 @@ class Store:
                 raise Conflict('任务已被其他操作更新，请刷新后重试')
             action = data.get('action', 'edit')
             state = task['state']
-            if action == 'edit':
+            if action == 'complete':
+                if task['executor'] != 'manual' or state not in {'draft', 'paused'}:
+                    raise ValueError('快速完成仅用于尚未完成的本人待办')
+                if self.blocked(task): raise ValueError('前置任务尚未完成')
+                task.update(state='done', evidence='用户直接勾选完成；不代表知识掌握')
+            elif action == 'delete':
+                if state not in {'draft','paused','done','failed','cancelled'}:
+                    raise ValueError('正在执行或结果未知的任务不能删除')
+                if any(t['id'] != tid and t['state'] != 'deleted' and tid in t['dependencies'] for t in self.list()):
+                    raise ValueError('其他任务依赖此任务，请先解除依赖')
+                task['state'] = 'deleted'
+            elif action == 'edit':
                 if state not in EDITABLE:
                     raise ValueError('请先暂停或重新打开任务再编辑')
                 self._fields(task, data)
+                from .workspace import attach_context
+                attach_context(self,task,data)
+            elif action == 'collaboration':
+                if state in {'done','deleted','cancelled'}: raise ValueError('请重新打开任务后调整协作')
+                from .workspace import attach_collaboration
+                previous=task.get('collaboration',{}).copy()
+                attach_collaboration(self,task,data)
+                task.setdefault('collaboration_history',[]).append(dict(time=now(),previous=previous,current=task['collaboration'].copy()))
+                if state=='waiting_external' and task['executor']=='agent-handoff':
+                    from .adapters import handoff
+                    task['result']=handoff(task)
             elif action == 'dispatch':
                 if state not in EDITABLE:
                     raise ValueError('当前状态不可派发')
@@ -217,5 +247,5 @@ class Store:
 
     def export(self):
         with self.lock:
-            return dict(schema_version=1, exported=now(), tasks=self.list(),
+            return dict(schema_version=2, exported=now(), tasks=self.list(), records=[dict(r) for r in self.db.execute('SELECT * FROM records')],
                         events=[dict(r) for r in self.db.execute('SELECT * FROM events ORDER BY seq')])

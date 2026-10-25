@@ -12,7 +12,7 @@
 
 ## 数据与运行
 
-`data/hub.sqlite3` 只保存工作台新增任务与事件，与 `.learning-terminal/learning.sqlite3`、`study-support.sqlite3` 分离。普通待办完成不会更新作业或掌握记录。现有学习库只读，不新增会话、不处理录音。schema 当前为版本 1；暂未提供导入恢复 UI 或跨版本迁移。
+`data/hub.sqlite3` 只保存工作台新增任务与事件，与 `.learning-terminal/learning.sqlite3`、`study-support.sqlite3` 分离。普通待办完成不会更新作业或掌握记录。现有学习库只读，不新增会话、不处理录音。schema 当前为版本 2；支持任务交接包导入，不提供全量数据库恢复或合并。
 
 服务仅监听 `127.0.0.1:8790`，每次启动生成随机访问凭证，验证 Host、Origin 与 API token。启动入口可复用已运行实例；凭证在 `data/runtime.json` 中仅用于本机窗口启动，不应分享或纳入 Git。关闭窗口不会停服务；左下角“停止本地服务”可显式停止。没有安装开机自启或计划任务。
 
@@ -30,7 +30,7 @@ Codex 所有：`hub/`、`web/`、启动器、核心测试；Qoder 所有：现�
 
 工作台的 requestId 在本地去重；远端接口不支持幂等键。提交后连接断开、超时、响应不可读或服务端错误一律记为结果未知，不自动重发。已知 runId 查询断线仍保留并继续查询；远端记录 404 则标记结果未知（服务仅保留最近 300 条历史），需人工核对。不会因工具 retryable=true 自动再次提交，周期退避由 Qoder 后端维护。
 
-Agent 尚未自动通信或按额度路由，额度显示未知。调度核心已具备依赖与验收，但还不是自主规划 Agent。本轮不调用收费模型进行测试。
+Agent 支持本机注册、轮询、心跳以及显式跨端文件交接；尚未连接远端持续通信或按额度路由。调度核心已具备依赖与验收，但还不是自主规划 Agent。本轮不调用收费模型进行测试。
 
 ## 验证
 
@@ -39,3 +39,6 @@ Agent 尚未自动通信或按额度路由，额度显示未知。调度核心�
 `node tests/ui.cjs`（需本机已有 Playwright 和 Edge，脚本支持 PLAYWRIGHT_PACKAGE/HUB_PYTHON 环境变量）
 
 UI 测试使用 tests/artifacts 下独立数据库；不在真实工作台中加入测试任务，不运行实际 Taber 打开动作，也不发送 Agent 消息。真实学习目录读取及本地入口检查会实际运行。
+
+
+双端主机和任务协作设置见 [AGENT-CONNECT.md](AGENT-CONNECT.md)。新增端到端页面测试：`node tests/collaboration-ui.cjs`（通过 `PLAYWRIGHT_MODULE` 指定 Playwright，`HUB_PYTHON` 指定 Python，`BROWSER_CHANNEL` 默认为 chrome）。

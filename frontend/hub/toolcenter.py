@@ -49,7 +49,15 @@ def request(path, body=None):
 
 def validate(tool, action, data):
     if tool not in TOOLS: raise ValueError('工具不在允许清单中')
-    if action not in {'run', 'enable', 'disable', 'backfill'}: raise ValueError('不支持的工具操作')
+    if action not in {'run', 'enable', 'disable', 'backfill', 'configure'}: raise ValueError('不支持的工具操作')
+    if action == 'configure':
+        if tool != 'dirwatch': raise ValueError('目前仅目录监听支持配置')
+        from pathlib import Path
+        watch=data.get('watchDir')
+        interval=data.get('intervalMinutes')
+        if not isinstance(watch,str) or not Path(watch).is_absolute() or not Path(watch).is_dir(): raise ValueError('请选择存在的绝对目录')
+        if type(interval) is not int or not 1 <= interval <= 1440: raise ValueError('检查间隔须为 1—1440 分钟')
+        return {'watchDir':watch,'intervalMinutes':interval}
     if tool == 'material-transfer' and action != 'backfill': raise ValueError('材料收发是服务类工具，仅支持查询与显式补发')
     if action == 'backfill':
         if tool != 'material-transfer': raise ValueError('补发仅由材料收发工具执行')

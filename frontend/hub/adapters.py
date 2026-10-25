@@ -44,6 +44,8 @@ def handoff(task):
             '\n任务 ID：' + task['id'] + '\n运行 ID：' + task['run_id'] +
             '\n目标与上下文：\n' + task['notes'] +
             '\n关联学习会话：' + (task['session'] or '无') +
+            '\n本轮配置（仅此任务快照）：\n' + json.dumps(task.get('config', {}),ensure_ascii=False) +
+            '\n协作项目与主 Agent：\n' + json.dumps({'project':task.get('project_snapshot'),'lead':task.get('lead_snapshot'),'assignment':task.get('agent_snapshot')},ensure_ascii=False) +
             '\n请返回实际结果、产物路径、验证证据和未完成项。不要把收到任务视为完成。')
 
 
@@ -95,3 +97,8 @@ def execute(task, cancelled):
             'assistant_connected':binding.get('connected'), 'assistant_error':binding.get('error'),
             'note':'当前文档及版本已读回匹配，请检查窗口排版后验收。阅读不代表掌握。'}, ensure_ascii=False, indent=2)
     raise ValueError('没有此执行适配器')
+
+
+_base_handoff = handoff
+def handoff(task):
+    return _base_handoff(task) + '\n\n任务协作约定（主机地位平等；离线不自动移交）：\n' + json.dumps(task.get('collaboration',{}),ensure_ascii=False,indent=2)

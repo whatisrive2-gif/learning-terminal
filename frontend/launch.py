@@ -12,7 +12,11 @@ from hub.server import serve, ROOT
 def open_window(url):
     edge = Path(os.environ.get('PROGRAMFILES(X86)', 'C:/Program Files (x86)')) / 'Microsoft/Edge/Application/msedge.exe'
     if edge.is_file():
+        from window_state import windows
+        previous=windows()
         subprocess.Popen([str(edge), '--app=' + url, '--new-window'], creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        subprocess.Popen([sys.executable, str(ROOT/'window_state.py'), *map(str,previous)],
+                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     else:
         webbrowser.open(url)
 

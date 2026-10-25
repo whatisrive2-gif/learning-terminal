@@ -13,3 +13,11 @@ frontend/data/
 frontend/tests/artifacts/
 frontend/startup-error.txt
 .venv/
+
+# Device-private state and transferred task envelopes
+*.db
+*.db-*
+**/runtime.json
+LT-handoff-*.json
+LT-result-*.json
+.DS_Store

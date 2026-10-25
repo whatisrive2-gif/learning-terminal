@@ -9,7 +9,7 @@ import time
 from urllib.parse import urlparse
 
 from .core import Store, Conflict
-from . import adapters, toolcenter
+from . import adapters, toolcenter, workspace, submission
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -107,18 +107,21 @@ def serve(port=8790, db=None):
         def do_GET(self):
             if not self.guard(): return
             path = urlparse(self.path).path
+            if path in {'/redesign.js','/blueprint.css'}:
+                return self.send(200, (ROOT/'web'/path[1:]).read_bytes(), ('text/javascript' if path.endswith('.js') else 'text/css')+'; charset=utf-8')
             if path in {'/', '/app.js', '/tool-ui.js', '/style.css'}:
                 name, mime = {'/':('index.html','text/html'), '/app.js':('app.js','text/javascript'), '/tool-ui.js':('tool-ui.js','text/javascript'), '/style.css':('style.css','text/css')}[path]
                 return self.send(200, (ROOT / 'web' / name).read_bytes(), mime + '; charset=utf-8')
             if not self.auth(): return
             try:
                 if path == '/api/state':
-                    tasks = hub.store.list()
+                    tasks = [t for t in hub.store.list() if t['state'] != 'deleted']
                     for task in tasks: task['blocked_by'] = hub.store.blocked(task)
                     data = dict(tasks=tasks, events=hub.store.events(), model_calls=0)
                 elif path == '/api/sessions': data = adapters.sessions()
                 elif path == '/api/inventory': data = adapters.inventory()
                 elif path == '/api/export': data = hub.store.export()
+                elif path == '/api/workspace': data = workspace.snapshot(hub.store)
                 elif path == '/api/tools': data = toolcenter.catalog()
                 elif path.startswith('/api/tools/'): data = toolcenter.detail(path.split('/')[-1])
                 else: return self.send(404, {'error':'没有此接口'})
@@ -137,6 +140,9 @@ def serve(port=8790, db=None):
                 if not isinstance(data, dict): raise ValueError('请求必须为对象')
                 path = urlparse(self.path).path
                 if path == '/api/tasks': result = hub.store.create(data)
+                elif path == '/api/agent': result = workspace.agent_action(hub.store,data)
+                elif path == '/api/submit': result = submission.send(hub.store,data)
+                elif path.startswith('/api/workspace/'): result = workspace.save(hub.store,path.split('/')[-1],data)
                 elif path == '/api/tool-actions': result = hub.store.create_tool(data)
                 elif path.startswith('/api/tasks/'):
                     result = hub.store.change(path.split('/')[-1], data)
